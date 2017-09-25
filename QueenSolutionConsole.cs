@@ -21,20 +21,20 @@ namespace QueenSolutionConsole
         public static void Main(string[] args)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
-  
+
             _Count = 0;
             _Spin = 0;
 
             BuildNew(0, (_BoardSize + 1) / 2, 0, 0, 0);
-            
+
             sw.Stop();
             Console.WriteLine($"Board Size = {_BoardSize}  Total Spin={_Spin}");
             Console.WriteLine($"Time {sw.ElapsedMilliseconds} milliseconds  Solutions={_Solutions.Count}");
 
         }
 
-      
-   
+
+
         //recursive method to iterate all potential positions
         //maintain state as we go so when we come back to a previous loop and iterate, we don't have to rebuild the entire state
         //only iterate through half as we use Y-flip to find other solutions
@@ -43,8 +43,7 @@ namespace QueenSolutionConsole
             long YLine = 0;
             long UpDiag = 0;
             long DownDiag = 0;
-            bool test = true;
-
+            
             long tempY = 0;
             long tempUp = 0;
             long tempDown = 0;
@@ -58,11 +57,9 @@ namespace QueenSolutionConsole
                 tempUp = 2 << (_BoardSize + x - position);
                 tempDown = 2 << (position + x);
 
-                test = (tempY & yline) != tempY;
-                test = test && ((tempDown & downdiag) != tempDown);
-                test = test && ((tempUp & updiag) != tempUp);
-
-                if (test)
+                if (((tempY & yline) == 0) &&
+                    ((tempDown & downdiag) == 0) &&
+                    ((tempUp & updiag) == 0))
                 {
                     if (position == _BoardSize - 1)
                     {
@@ -117,6 +114,8 @@ namespace QueenSolutionConsole
 
             return test;
         }
+
+        //not used yet
         private static int[] Rotate90(int[] placed)
         {
             int[] test = new int[_BoardSize];
