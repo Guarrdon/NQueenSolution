@@ -85,7 +85,7 @@ namespace QueenSolutionConsole
                         downdiag = DownDiag;
                     }
                 }
-                test = true;
+                
             }
         }
 
