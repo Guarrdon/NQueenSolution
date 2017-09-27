@@ -1,39 +1,45 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using Stopwatch = System.Diagnostics.Stopwatch;
 using System.Linq;
 
 namespace QueenSolutionConsole
 {
-    public class Program
+    public partial class Program
     {
-
-        //constant table size >=4
-        private const int _BoardSize = 15;
+        private static int _BoardSize = 14;
         private static long _Count;
         private static long _Spin;
+#if CONST14
         private static int[][] _Loops = new int[_BoardSize][];
         private static int[] _Current = new int[_BoardSize];
+#else
+        private static int[][] _Loops;
+        private static int[] _Current;
+#endif
         private static int[] _Rotated;
         private static ConcurrentDictionary<string, int[]> _Solutions = new ConcurrentDictionary<string, int[]>();
 
-
         public static void Main(string[] args)
         {
-            var sw = System.Diagnostics.Stopwatch.StartNew();
+#if CONST14
+            var sw = Stopwatch.StartNew();
+#else
+            if (args.Any())
+                _BoardSize = int.Parse(args[0]);
 
+            var sw = Stopwatch.StartNew();
+            _Loops = new int[_BoardSize][];
+            _Current = new int[_BoardSize];
+#endif
             _Count = 0;
             _Spin = 0;
 
             BuildNew(0, (_BoardSize + 1) / 2, 0, 0, 0);
-
             sw.Stop();
-            Console.WriteLine($"Board Size = {_BoardSize}  Total Spin={_Spin}");
-            Console.WriteLine($"Time {sw.ElapsedMilliseconds} milliseconds  Solutions={_Solutions.Count}");
-
+            ReportSummary(sw);
         }
-
-
 
         //recursive method to iterate all potential positions
         //maintain state as we go so when we come back to a previous loop and iterate, we don't have to rebuild the entire state
@@ -43,7 +49,7 @@ namespace QueenSolutionConsole
             long YLine = 0;
             long UpDiag = 0;
             long DownDiag = 0;
-            
+
             long tempY = 0;
             long tempUp = 0;
             long tempDown = 0;
@@ -85,7 +91,7 @@ namespace QueenSolutionConsole
                         downdiag = DownDiag;
                     }
                 }
-                
+
             }
         }
 
