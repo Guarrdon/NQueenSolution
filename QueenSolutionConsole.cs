@@ -10,7 +10,7 @@ namespace QueenSolutionConsole
 {
     public partial class Program
     {
-        private const int _BoardSize = 16;
+        private const int _BoardSize = 18;
         public static void Main(string[] args)
         {
             var sw = Stopwatch.StartNew();
@@ -46,13 +46,11 @@ namespace QueenSolutionConsole
             private long _YLine;
             private long _DownDiag;
             private long _UpDiag;
- 
             public Solver(int boardSize)
             {
                 BoardSize = boardSize;
                 _Current = new int[boardSize];
                 Solutions = new Stack<int[]>();
-
             }
             //recursive method to iterate all potential positions
             //maintain state as we go so when we come back to a previous loop and iterate, we don't have to rebuild the entire state
