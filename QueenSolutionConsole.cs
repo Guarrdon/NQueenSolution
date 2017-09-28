@@ -11,30 +11,23 @@ namespace QueenSolutionConsole
         private static int _BoardSize = 14;
         private static long _Count;
         private static long _Spin;
-#if CONST14
-        private static int[][] _Loops = new int[_BoardSize][];
-        private static int[] _Current = new int[_BoardSize];
-#else
         private static int[][] _Loops;
         private static int[] _Current;
-#endif
         private static int[] _Rotated;
+
         private static ConcurrentDictionary<ulong, int[]> _Solutions = new ConcurrentDictionary<ulong, int[]>();
 
         public static void Main(string[] args)
         {
-#if CONST14
-            var sw = Stopwatch.StartNew();
-#else
             if (args.Any())
                 _BoardSize = int.Parse(args[0]);
+            if (_BoardSize > 16)
+                throw new ArgumentOutOfRangeException(nameof(_BoardSize), "Branches derived from dedupe_long cannot run board sizes over 16.");
 
             var sw = Stopwatch.StartNew();
+
             _Loops = new int[_BoardSize][];
             _Current = new int[_BoardSize];
-#endif
-            _Count = 0;
-            _Spin = 0;
 
             BuildNew(0, (_BoardSize + 1) / 2, 0, 0, 0);
             sw.Stop();
