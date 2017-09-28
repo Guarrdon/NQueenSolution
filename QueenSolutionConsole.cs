@@ -19,7 +19,7 @@ namespace QueenSolutionConsole
         private static int[] _Current;
 #endif
         private static int[] _Rotated;
-        private static ConcurrentDictionary<string, int[]> _Solutions = new ConcurrentDictionary<string, int[]>();
+        private static ConcurrentDictionary<ulong, int[]> _Solutions = new ConcurrentDictionary<ulong, int[]>();
 
         public static void Main(string[] args)
         {
@@ -70,11 +70,18 @@ namespace QueenSolutionConsole
                     if (position == _BoardSize - 1)
                     {
                         _Count++;
-                        _Solutions.TryAdd(string.Join(",", _Current), _Current);
+
+                        ulong sol = 0;
+                        foreach (uint s in _Current)
+                            sol = (sol << 4) | s; // only works for boardSize <= 16
+                        _Solutions.TryAdd(sol, _Current);
                         _Rotated = YFlip(_Current);
-                        _Solutions.TryAdd(string.Join(",", _Rotated), _Rotated);
+                        ulong sol2 = 0;
+                        foreach (uint s in _Rotated)
+                            sol2 = (sol2 << 4) | s;
+                        _Solutions.TryAdd(sol2, _Rotated);
                     }
-                    if (position < _BoardSize - 1)
+                    else if (position < _BoardSize - 1)
                     {
                         YLine = yline;
                         UpDiag = updiag;
