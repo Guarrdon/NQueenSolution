@@ -10,14 +10,13 @@ namespace QueenSolutionConsole
 {
     public partial class Program
     {
-        private const int _BoardSize = 15;
+        private const int _BoardSize = 16;
         public static void Main(string[] args)
         {
             var sw = Stopwatch.StartNew();
 
             long count = 0;
             long spin = 0;
-
 
             ParallelOptions po = new ParallelOptions()
             {
@@ -47,12 +46,10 @@ namespace QueenSolutionConsole
             private long _YLine;
             private long _DownDiag;
             private long _UpDiag;
-            //private int _Mid;
-
+ 
             public Solver(int boardSize)
             {
                 BoardSize = boardSize;
-                //_Mid = (boardSize + 1) / 2;
                 _Current = new int[boardSize];
                 Solutions = new Stack<int[]>();
 
@@ -82,10 +79,10 @@ namespace QueenSolutionConsole
                         ((tempDown & _DownDiag) == 0) &&
                         ((tempUp & _UpDiag) == 0))
                     {
+                        _Current[position] = x;
 
                         if (position == BoardSize - 1)
                         {
-                            _Current[position] = x;
                             Count++;
                             int[] t1 = new int[BoardSize];
                             Array.Copy(_Current, t1, BoardSize);
