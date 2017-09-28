@@ -7,10 +7,10 @@ namespace QueenSolutionConsole
 {
     public partial class Program
     {
-        static void ReportSummary(Stopwatch sw, long count, long spins)
+        static void ReportSummary(Stopwatch sw, int boardSize, long count, long spins)
         {
             var summary = new StringBuilder()
-                .AppendLine($"Board Size = {_BoardSize}  Total Spin={spins}")
+                .AppendLine($"Board Size = {boardSize}  Total Spin={spins}")
                 .AppendLine($"Time {sw.ElapsedMilliseconds} milliseconds  Solutions={count}")
                 .AppendLine($" at {DateTime.UtcNow:s}Z by {Environment.UserName}")
                 .ToString();
@@ -18,7 +18,7 @@ namespace QueenSolutionConsole
             Console.WriteLine(summary);
 
             System.IO.Directory.CreateDirectory("output"); // ensure directory exists
-            System.IO.File.WriteAllText(System.IO.Path.Combine("output", $"board_{_BoardSize:00}_summary.txt"), summary);
+            System.IO.File.WriteAllText(System.IO.Path.Combine("output", $"board_{boardSize:00}_summary.txt"), summary);
         }
     }
 }
