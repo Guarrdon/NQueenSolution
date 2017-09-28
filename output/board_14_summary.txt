@@ -1,3 +1,3 @@
 Board Size = 14  Total Spin=188950699
-Time 1170 milliseconds  Solutions=365596
- at 2017-09-28T00:18:23Z by yzorg
+Time 1169 milliseconds  Solutions=365596
+ at 2017-09-28T01:38:11Z by yzorg

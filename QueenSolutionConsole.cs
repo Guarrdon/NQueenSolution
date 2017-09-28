@@ -1,21 +1,25 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using Stopwatch = System.Diagnostics.Stopwatch;
 using System.Linq;
+using System.Threading.Tasks;
+using Stopwatch = System.Diagnostics.Stopwatch;
 
 namespace QueenSolutionConsole
 {
     public partial class Program
     {
-        private static int _BoardSize = 14;
-        private static long _Count;
-        private static long _Spin;
-        private static int[][] _Loops;
-        private static int[] _Current;
-        private static int[] _Rotated;
+        static int _BoardSize = 15;
+        static int _Parallelism = 8;
+        static int _MidY;
+        static Program[] _Solvers;
 
-        private static ConcurrentDictionary<ulong, int[]> _Solutions = new ConcurrentDictionary<ulong, int[]>();
+        long _Count;
+        long _Spin;
+        int[] _Current;
+
+        int xStart; // first column start
+        int xEnd;   // first column end
 
         public static void Main(string[] args)
         {
@@ -26,18 +30,45 @@ namespace QueenSolutionConsole
 
             var sw = Stopwatch.StartNew();
 
-            _Loops = new int[_BoardSize][];
-            _Current = new int[_BoardSize];
+            var firstColumnEnd = (_BoardSize + 1) / 2;
+            if (_BoardSize % 2 == 1)
+                _MidY = firstColumnEnd - 1; // odd: last column computed
+            else
+                _MidY = -1; // no midpoint column for even number of columns
 
-            BuildNew(0, (_BoardSize + 1) / 2, 0, 0, 0);
+#if SINGLE_THREADED
+            var solver = new Program() { xStart = 0, xEnd = firstColumnEnd };
+            _Parallelism = 1;                     // for reporting
+            _Solvers = new Program[1] { solver }; // for reporting
+            solver.Solve();
+#else
+            _Solvers = new Program[firstColumnEnd];
+            for (int i = 0; i < _Solvers.Length; ++i)
+            {
+                _Solvers[i] = new Program() { xStart = i, xEnd = i + 1 };
+            }
+
+            var parallelOptions = new ParallelOptions() { MaxDegreeOfParallelism = _Parallelism };
+            var result = Parallel.ForEach(_Solvers, parallelOptions, solver => solver.Solve());
+#endif
             sw.Stop();
             ReportSummary(sw);
+        }
+
+        public Program()
+        {
+            _Current = new int[_BoardSize];
+        }
+
+        void Solve()
+        {
+            BuildNew(0, 0, 0, 0);
         }
 
         //recursive method to iterate all potential positions
         //maintain state as we go so when we come back to a previous loop and iterate, we don't have to rebuild the entire state
         //only iterate through half as we use Y-flip to find other solutions
-        private static void BuildNew(int position, int end, long yline, long updiag, long downdiag)
+        void BuildNew(int position, long yline, long updiag, long downdiag)
         {
             long YLine = 0;
             long UpDiag = 0;
@@ -47,7 +78,9 @@ namespace QueenSolutionConsole
             long tempUp = 0;
             long tempDown = 0;
 
-            for (int x = 0; x < end; x++)
+            int start = (position == 0) ? xStart : 0;
+            int end = (position == 0) ? xEnd : _BoardSize;
+            for (int x = start; x < end; x++)
             {
                 _Spin++;
                 _Current[position] = x;
@@ -63,16 +96,8 @@ namespace QueenSolutionConsole
                     if (position == _BoardSize - 1)
                     {
                         _Count++;
-
-                        ulong sol = 0;
-                        foreach (uint s in _Current)
-                            sol = (sol << 4) | s; // only works for boardSize <= 16
-                        _Solutions.TryAdd(sol, _Current);
-                        _Rotated = YFlip(_Current);
-                        ulong sol2 = 0;
-                        foreach (uint s in _Rotated)
-                            sol2 = (sol2 << 4) | s;
-                        _Solutions.TryAdd(sol2, _Rotated);
+                        if (_Current[0] != _MidY)
+                            _Count++; // count the y-flip without checking it: there is no posibility of duplicates or collisions
                     }
                     else if (position < _BoardSize - 1)
                     {
@@ -84,7 +109,7 @@ namespace QueenSolutionConsole
                         downdiag = tempDown | downdiag;
                         updiag = tempUp | updiag;
 
-                        BuildNew(position + 1, _BoardSize, yline, updiag, downdiag);
+                        BuildNew(position + 1, yline, updiag, downdiag);
 
                         yline = YLine;
                         updiag = UpDiag;
