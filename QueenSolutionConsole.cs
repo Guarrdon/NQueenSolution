@@ -3,48 +3,60 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Stopwatch = System.Diagnostics.Stopwatch;
 using System.Linq;
+using System.Threading.Tasks;
+using System.Threading;
 
 namespace QueenSolutionConsole
 {
     public partial class Program
     {
-        private static int _BoardSize = 14;
-        private static long _Count;
-        private static long _Spin;
-#if CONST14
-        private static int[][] _Loops = new int[_BoardSize][];
-        private static int[] _Current = new int[_BoardSize];
-#else
-        private static int[][] _Loops;
-        private static int[] _Current;
-#endif
-        private static int[] _Rotated;
-        private static ConcurrentDictionary<string, int[]> _Solutions = new ConcurrentDictionary<string, int[]>();
+        private const int _BoardSize = 16;
+        //private static long _Count;
+        //private static long _Spin;
+
+        //private static int[] _Current;
+        //private static int[] _Rotated;
+        //private static Stack<int[]> _Solutions = new Stack<int[]>();
 
         public static void Main(string[] args)
         {
-#if CONST14
-            var sw = Stopwatch.StartNew();
-#else
-            if (args.Any())
-                _BoardSize = int.Parse(args[0]);
+            //if (args.Any())
+            //    _BoardSize = int.Parse(args[0]);
 
             var sw = Stopwatch.StartNew();
-            _Loops = new int[_BoardSize][];
-            _Current = new int[_BoardSize];
-#endif
-            _Count = 0;
-            _Spin = 0;
 
-            BuildNew(0, (_BoardSize + 1) / 2, 0, 0, 0);
+            long count = 0;
+            int[][] current = new int[_BoardSize][];
+            //long[] spins = new long[_BoardSize];
+            Stack<int[]>[] solutions = new Stack<int[]>[_BoardSize];
+
+            for (int x = 0; x < _BoardSize; x++)
+            {
+                current[x] = new int[_BoardSize];
+                //spins[x] = 0;
+                solutions[x] = new Stack<int[]>();
+            }
+
+            ParallelOptions po = new ParallelOptions()
+            {
+                MaxDegreeOfParallelism = 8,
+            };
+
+            var result = Parallel.For(0, _BoardSize, po,
+                (index) =>
+                {
+                    var cnt = BuildNew(0, index, index + 1, 0, 0, 0, ref current[index],  ref solutions[index]);
+                    Interlocked.Add(ref count, cnt);
+                });
+
             sw.Stop();
-            ReportSummary(sw);
+            ReportSummary(sw, count, 0);
         }
 
         //recursive method to iterate all potential positions
         //maintain state as we go so when we come back to a previous loop and iterate, we don't have to rebuild the entire state
         //only iterate through half as we use Y-flip to find other solutions
-        private static void BuildNew(int position, int end, long yline, long updiag, long downdiag)
+        private static long BuildNew(int position, int start, int end, long yline, long updiag, long downdiag, ref int[] current, ref Stack<int[]> solutions)
         {
             long YLine = 0;
             long UpDiag = 0;
@@ -54,10 +66,11 @@ namespace QueenSolutionConsole
             long tempUp = 0;
             long tempDown = 0;
 
-            for (int x = 0; x < end; x++)
+            long count = 0;
+
+            for (int x = start; x < end; x++)
             {
-                _Spin++;
-                _Current[position] = x;
+                //spins++;
 
                 tempY = 2 << x;
                 tempUp = 2 << (_BoardSize + x - position);
@@ -67,12 +80,16 @@ namespace QueenSolutionConsole
                     ((tempDown & downdiag) == 0) &&
                     ((tempUp & updiag) == 0))
                 {
+
                     if (position == _BoardSize - 1)
                     {
-                        _Count++;
-                        _Solutions.TryAdd(string.Join(",", _Current), _Current);
-                        _Rotated = YFlip(_Current);
-                        _Solutions.TryAdd(string.Join(",", _Rotated), _Rotated);
+                        //current[position] = x;
+
+                        count++;
+                        //int[] t1 = new int[_BoardSize];
+                        //Array.Copy(current, t1, _BoardSize);
+                        //solutions.Push(t1);
+
                     }
                     if (position < _BoardSize - 1)
                     {
@@ -84,7 +101,7 @@ namespace QueenSolutionConsole
                         downdiag = tempDown | downdiag;
                         updiag = tempUp | updiag;
 
-                        BuildNew(position + 1, _BoardSize, yline, updiag, downdiag);
+                        count += BuildNew(position + 1, 0, _BoardSize, yline, updiag, downdiag, ref current,  ref solutions);
 
                         yline = YLine;
                         updiag = UpDiag;
@@ -93,6 +110,8 @@ namespace QueenSolutionConsole
                 }
 
             }
+            return count;
+
         }
 
 
@@ -111,7 +130,7 @@ namespace QueenSolutionConsole
             return test;
         }
 
-        //used to add y axis flipped solution
+        //not used
         private static int[] YFlip(int[] placed)
         {
             int[] test = new int[_BoardSize];

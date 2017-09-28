@@ -7,11 +7,11 @@ namespace QueenSolutionConsole
 {
     public partial class Program
     {
-        static void ReportSummary(Stopwatch sw)
+        static void ReportSummary(Stopwatch sw, long count, long spins)
         {
             var summary = new StringBuilder()
-                .AppendLine($"Board Size = {_BoardSize}  Total Spin={_Spin}")
-                .AppendLine($"Time {sw.ElapsedMilliseconds} milliseconds  Solutions={_Solutions.Count}")
+                .AppendLine($"Board Size = {_BoardSize}  Total Spin={spins}")
+                .AppendLine($"Time {sw.ElapsedMilliseconds} milliseconds  Solutions={count}")
                 .AppendLine($" at {DateTime.UtcNow:s}Z by {Environment.UserName}")
                 .ToString();
 
