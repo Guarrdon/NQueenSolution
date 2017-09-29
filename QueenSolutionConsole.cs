@@ -10,7 +10,7 @@ namespace QueenSolutionConsole
 {
     public partial class Program
     {
-        private const int _BoardSize = 18;
+        private const int _BoardSize = 16;
         public static void Main(string[] args)
         {
             var sw = Stopwatch.StartNew();
@@ -61,21 +61,21 @@ namespace QueenSolutionConsole
                 long UpDiag = 0;
                 long DownDiag = 0;
 
-                long tempY = 0;
-                long tempUp = 0;
-                long tempDown = 0;
+                //long tempY = 0;
+                //long tempUp = 0;
+                //long tempDown = 0;
 
                 for (int x = start; x < end; x++)
                 {
                     Spin++;
 
-                    tempY = 2 << x;
-                    tempUp = 2 << (BoardSize + x - position);
-                    tempDown = 2 << (position + x);
+                    //tempY = 2 << x;
+                    //tempUp = 2 << (BoardSize + x - position);
+                    //tempDown = 2 << (position + x);
 
-                    if (((tempY & _YLine) == 0) &&
-                        ((tempDown & _DownDiag) == 0) &&
-                        ((tempUp & _UpDiag) == 0))
+                    if ((((2 << x) & _YLine) == 0) &&
+                        (((2 << (position + x)) & _DownDiag) == 0) &&
+                        (((2 << (BoardSize + x - position)) & _UpDiag) == 0))
                     {
                         _Current[position] = x;
 
@@ -93,9 +93,9 @@ namespace QueenSolutionConsole
                             UpDiag = _UpDiag;
                             DownDiag = _DownDiag;
 
-                            _YLine = tempY | _YLine;
-                            _DownDiag = tempDown | _DownDiag;
-                            _UpDiag = tempUp | _UpDiag;
+                            _YLine = (2U << x) | _YLine;
+                            _DownDiag = (2U << (position + x)) | _DownDiag;
+                            _UpDiag = (2U << (BoardSize + x - position)) | _UpDiag;
 
                             BuildNew(position + 1, 0, BoardSize);
 
