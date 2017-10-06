@@ -10,104 +10,196 @@ namespace QueenSolutionConsole
 {
     public partial class Program
     {
-        private const int _BoardSize = 16;
+        static int BoardSize = 16;
+        static int BoardSizeMinus1 = BoardSize - 1;
+
         public static void Main(string[] args)
         {
+            if (args.Any())
+            {
+                BoardSize = int.Parse(args[0]);
+                BoardSizeMinus1 = BoardSize - 1;
+            }
+
             var sw = Stopwatch.StartNew();
 
             long count = 0;
             long spin = 0;
+            long activeSolvers = 0;
+            long maxNumberActiveSolvers = 0;
 
-            ParallelOptions po = new ParallelOptions()
+            if (BoardSize < 12)
             {
-                MaxDegreeOfParallelism = 8,
-            };
+                var solver = new Solver(BoardSize);
+                solver.Build1(0);
+                spin = solver.Spin;
+                count = solver.Count;
+                maxNumberActiveSolvers = 1;
+            }
+            else
+            {
+                var po = new ParallelOptions() { MaxDegreeOfParallelism = 8 };
 
-            var result = Parallel.For(0, _BoardSize, po,
-                (index) =>
+                Parallel.For(0, BoardSize, po, (index) =>
                 {
-                    var solver = new Solver(_BoardSize);
-                    solver.BuildNew(0, index, index + 1);
-                    Interlocked.Add(ref count, solver.Count);
-                    Interlocked.Add(ref spin, solver.Spin);
+                    try
+                    {
+                        long active = Interlocked.Increment(ref activeSolvers);
+                        if (active > maxNumberActiveSolvers)
+                            maxNumberActiveSolvers = active; // this doesn't have to be threadsafe... 
+                        var solver = new Solver(BoardSize);
+                        solver.Build0(0, index, index + 1);
+                        Interlocked.Add(ref count, solver.Count);
+                        Interlocked.Add(ref spin, solver.Spin);
+                    }
+                    finally
+                    {
+                        Interlocked.Decrement(ref activeSolvers);
+                    }
                 });
+            }
 
             sw.Stop();
-            ReportSummary(sw, _BoardSize, count, spin);
+            ReportSummary(sw, BoardSize, count, spin, maxNumberActiveSolvers);
         }
 
         public class Solver
         {
-            public int BoardSize;
+            private int BoardSize;
+            private int BoardSizeMinus1;
+
             public long Spin;
             public long Count;
             public Stack<int[]> Solutions;
             private int[] _Current;
-            private long _YLine;
-            private long _DownDiag;
-            private long _UpDiag;
+            private uint _YLine;
+            private uint _DownDiag;
+            private uint _UpDiag;
+
             public Solver(int boardSize)
             {
                 BoardSize = boardSize;
-                _Current = new int[boardSize];
+                BoardSizeMinus1 = boardSize - 1; // pre-calculate b/c it's used n-squared times inside recursive loop
+
+                _Current = new int[BoardSize];
                 Solutions = new Stack<int[]>();
             }
+
             //recursive method to iterate all potential positions
             //maintain state as we go so when we come back to a previous loop and iterate, we don't have to rebuild the entire state
             //only iterate through half as we use Y-flip to find other solutions
-            public void BuildNew(int position, int start, int end)
+            public void Build0(int position, int start, int end)
             {
-                long YLine = 0;
-                long UpDiag = 0;
-                long DownDiag = 0;
+                uint tempY, tempDown, tempUp;
 
-                //long tempY = 0;
-                //long tempUp = 0;
-                //long tempDown = 0;
+                if (start == 0)
+                {
+                    tempY = 1u;
+                    tempUp = 1u << position;
+                    // Natural down diaganal would be -8 (h1) => +8 (a8).
+                    // We shift it by +BoardSize to keep values positive.  So our 
+                    // down diaganal is 0 (h1) => +16 (a8).
+                    tempDown = 1u << BoardSize + position;
+                }
+                else if (position == 0)
+                {
+                    tempY = 1u << start;
+                    tempUp = 1u << start;
+                    tempDown = 1u << BoardSize - start;
+                }
+                else
+                    throw new Exception("bad state for optimized shift");
 
-                for (int x = start; x < end; x++)
+                for (int x = start; x < end; x++, tempY <<= 1, tempUp <<= 1, tempDown >>= 1)
                 {
                     Spin++;
 
-                    //tempY = 2 << x;
-                    //tempUp = 2 << (BoardSize + x - position);
-                    //tempDown = 2 << (position + x);
-
-                    if ((((2 << x) & _YLine) == 0) &&
-                        (((2 << (position + x)) & _DownDiag) == 0) &&
-                        (((2 << (BoardSize + x - position)) & _UpDiag) == 0))
+                    if ((tempY & _YLine) == 0 &&
+                        (tempDown & _DownDiag) == 0 &&
+                        (tempUp & _UpDiag) == 0)
                     {
                         _Current[position] = x;
 
-                        if (position == BoardSize - 1)
+                        if (position < BoardSizeMinus1)
+                        {
+                            var YLine = _YLine;
+                            var UpDiag = _UpDiag;
+                            var DownDiag = _DownDiag;
+
+                            _YLine |= tempY;
+                            _DownDiag |= tempDown;
+                            _UpDiag |= tempUp;
+
+                            Build1(position + 1);
+                            //Build0(position + 1, 0, BoardSize);
+
+                            //_YLine &= ~tempY;
+                            //_DownDiag &= ~tempDown;
+                            //_UpDiag &= ~tempUp;
+                            _YLine = YLine;
+                            _UpDiag = UpDiag;
+                            _DownDiag = DownDiag;
+                        }
+                        else //if (position == BoardSize - 1)
                         {
                             Count++;
                             int[] t1 = new int[BoardSize];
                             Array.Copy(_Current, t1, BoardSize);
                             Solutions.Push(t1);
-
-                        }
-                        if (position < BoardSize - 1)
-                        {
-                            YLine = _YLine;
-                            UpDiag = _UpDiag;
-                            DownDiag = _DownDiag;
-
-                            _YLine = (2U << x) | _YLine;
-                            _DownDiag = (2U << (position + x)) | _DownDiag;
-                            _UpDiag = (2U << (BoardSize + x - position)) | _UpDiag;
-
-                            BuildNew(position + 1, 0, BoardSize);
-
-                            _YLine = YLine;
-                            _UpDiag = UpDiag;
-                            _DownDiag = DownDiag;
                         }
                     }
 
                 }
             }
 
+            public void Build1(int position)
+            {
+                uint tempY = 1u;
+                uint tempUp = 1u << position;
+                // Natural down diaganal would be -8 (h1) => +8 (a8).
+                // We shift it by +BoardSize to keep values positive.  So our 
+                // down diaganal is 0 (h1) => +16 (a8).
+                uint tempDown = 1u << BoardSize + position;
+
+                for (int x = 0; x < BoardSize; x++, tempY <<= 1, tempUp <<= 1, tempDown >>= 1)
+                {
+                    Spin++;
+
+                    if ((tempY & _YLine) == 0 &&
+                        (tempDown & _DownDiag) == 0 &&
+                        (tempUp & _UpDiag) == 0)
+                    {
+                        _Current[position] = x;
+
+                        if (position < BoardSizeMinus1)
+                        {
+                            var YLine = _YLine;
+                            var UpDiag = _UpDiag;
+                            var DownDiag = _DownDiag;
+
+                            _YLine |= tempY;
+                            _DownDiag |= tempDown;
+                            _UpDiag |= tempUp;
+
+                            Build1(position + 1);
+
+                            //_YLine &= ~tempY;
+                            //_DownDiag &= ~tempDown;
+                            //_UpDiag &= ~tempUp;
+                            _YLine = YLine;
+                            _UpDiag = UpDiag;
+                            _DownDiag = DownDiag;
+                        }
+                        else //if (position == BoardSize - 1)
+                        {
+                            Count++;
+                            int[] t1 = new int[BoardSize];
+                            Array.Copy(_Current, t1, BoardSize);
+                            Solutions.Push(t1);
+                        }
+                    }
+                }
+            }
 
             //not used yet
             private int[] XFlip(int[] placed)
