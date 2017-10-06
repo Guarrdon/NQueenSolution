@@ -10,7 +10,7 @@ namespace QueenSolutionConsole
 {
     public partial class Program
     {
-        static int BoardSize = 16;
+        static int BoardSize = 15;
         static int BoardSizeMinus1 = BoardSize - 1;
 
         public static void Main(string[] args)
@@ -65,12 +65,8 @@ namespace QueenSolutionConsole
 
         public class Solver
         {
-            private int BoardSize;
-            private int BoardSizeMinus1;
-
             public long Spin;
             public long Count;
-            public Stack<int[]> Solutions;
             private int[] _Current;
             private uint _YLine;
             private uint _DownDiag;
@@ -78,11 +74,7 @@ namespace QueenSolutionConsole
 
             public Solver(int boardSize)
             {
-                BoardSize = boardSize;
-                BoardSizeMinus1 = boardSize - 1; // pre-calculate b/c it's used n-squared times inside recursive loop
-
                 _Current = new int[BoardSize];
-                Solutions = new Stack<int[]>();
             }
 
             //recursive method to iterate all potential positions
@@ -120,33 +112,15 @@ namespace QueenSolutionConsole
                     {
                         _Current[position] = x;
 
-                        if (position < BoardSizeMinus1)
-                        {
-                            var YLine = _YLine;
-                            var UpDiag = _UpDiag;
-                            var DownDiag = _DownDiag;
+                        _YLine += tempY;
+                        _DownDiag += tempDown;
+                        _UpDiag += tempUp;
 
-                            _YLine |= tempY;
-                            _DownDiag |= tempDown;
-                            _UpDiag |= tempUp;
+                        Build1(position + 1);
 
-                            Build1(position + 1);
-                            //Build0(position + 1, 0, BoardSize);
-
-                            //_YLine &= ~tempY;
-                            //_DownDiag &= ~tempDown;
-                            //_UpDiag &= ~tempUp;
-                            _YLine = YLine;
-                            _UpDiag = UpDiag;
-                            _DownDiag = DownDiag;
-                        }
-                        else //if (position == BoardSize - 1)
-                        {
-                            Count++;
-                            int[] t1 = new int[BoardSize];
-                            Array.Copy(_Current, t1, BoardSize);
-                            Solutions.Push(t1);
-                        }
+                        _YLine -= tempY;
+                        _DownDiag -= tempDown;
+                        _UpDiag -= tempUp;
                     }
 
                 }
@@ -156,6 +130,7 @@ namespace QueenSolutionConsole
             {
                 uint tempY = 1u;
                 uint tempUp = 1u << position;
+
                 // Natural down diaganal would be -8 (h1) => +8 (a8).
                 // We shift it by +BoardSize to keep values positive.  So our 
                 // down diaganal is 0 (h1) => +16 (a8).
@@ -173,29 +148,22 @@ namespace QueenSolutionConsole
 
                         if (position < BoardSizeMinus1)
                         {
-                            var YLine = _YLine;
-                            var UpDiag = _UpDiag;
-                            var DownDiag = _DownDiag;
-
-                            _YLine |= tempY;
-                            _DownDiag |= tempDown;
-                            _UpDiag |= tempUp;
+                            _YLine += tempY;
+                            _DownDiag += tempDown;
+                            _UpDiag += tempUp;
 
                             Build1(position + 1);
 
-                            //_YLine &= ~tempY;
-                            //_DownDiag &= ~tempDown;
-                            //_UpDiag &= ~tempUp;
-                            _YLine = YLine;
-                            _UpDiag = UpDiag;
-                            _DownDiag = DownDiag;
+                            _YLine -= tempY;
+                            _DownDiag -= tempDown;
+                            _UpDiag -= tempUp;
                         }
                         else //if (position == BoardSize - 1)
                         {
                             Count++;
-                            int[] t1 = new int[BoardSize];
-                            Array.Copy(_Current, t1, BoardSize);
-                            Solutions.Push(t1);
+                            //int[] t1 = new int[BoardSize];
+                            //Array.Copy(_Current, t1, BoardSize);
+                            //Solutions.Push(t1);
                         }
                     }
                 }
