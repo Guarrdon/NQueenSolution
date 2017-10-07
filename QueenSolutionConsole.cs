@@ -8,9 +8,14 @@ using System.Threading;
 
 namespace QueenSolutionConsole
 {
+    // diagonal has to have number of bits: boardsize * 2
+    // boardsize 16 is largest board that fits in UInt32
+    // boardsize 17+ requires UInt64
+    using TestIntType = System.UInt64;
+
     public partial class Program
     {
-        static int BoardSize = 15;
+        static int BoardSize = 13;
         static int BoardSizeMinus1 = BoardSize - 1;
 
         public static void Main(string[] args)
@@ -21,83 +26,145 @@ namespace QueenSolutionConsole
                 BoardSizeMinus1 = BoardSize - 1;
             }
 
-            var sw = Stopwatch.StartNew();
+            if (BoardSize <= 12)
+            {
+                BackTrackingSingleThreaded();
+            }
+            //else if (BoardSize == 17)
+            //    BackTrackingParallel();
+            else //if (BoardSize < 17)
+            {
+                //BackTrackingParallel();
+                FirstColumnHalfWithFlip();
+            }
+        }
 
-            long count = 0;
-            long spin = 0;
+        static void BackTrackingSingleThreaded()
+        {
+            var sw = Stopwatch.StartNew();
+            var solver = new Solver();
+
+            solver.Build1(0);
+
+            sw.Stop();
+            ReportSummary(sw, BoardSize, solver.SolutionCount, solver.Spin, 1);
+        }
+
+        static void BackTrackingParallel()
+        {
+            var sw = Stopwatch.StartNew();
             long activeSolvers = 0;
             long maxNumberActiveSolvers = 0;
 
-            if (BoardSize < 12)
-            {
-                var solver = new Solver(BoardSize);
-                solver.Build1(0);
-                spin = solver.Spin;
-                count = solver.Count;
-                maxNumberActiveSolvers = 1;
-            }
-            else
-            {
-                var po = new ParallelOptions() { MaxDegreeOfParallelism = 8 };
+            var bag = new ConcurrentBag<Solver>();
 
-                Parallel.For(0, BoardSize, po, (index) =>
+            var po = new ParallelOptions() { MaxDegreeOfParallelism = 8 };
+            Parallel.For(0, BoardSize, po, (index) =>
+            {
+                try
                 {
-                    try
-                    {
-                        long active = Interlocked.Increment(ref activeSolvers);
-                        if (active > maxNumberActiveSolvers)
-                            maxNumberActiveSolvers = active; // this doesn't have to be threadsafe... 
-                        var solver = new Solver(BoardSize);
-                        solver.Build0(0, index, index + 1);
-                        Interlocked.Add(ref count, solver.Count);
-                        Interlocked.Add(ref spin, solver.Spin);
-                    }
-                    finally
-                    {
-                        Interlocked.Decrement(ref activeSolvers);
-                    }
-                });
-            }
+                    long active = Interlocked.Increment(ref activeSolvers);
+                    if (active > maxNumberActiveSolvers)
+                        maxNumberActiveSolvers = active;
+
+                    var solver = new Solver();
+                    solver.Build0(0, index, index + 1);
+                    bag.Add(solver);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref activeSolvers);
+                }
+            });
 
             sw.Stop();
-            ReportSummary(sw, BoardSize, count, spin, maxNumberActiveSolvers);
+            ReportSummary(sw, BoardSize, bag.Sum(x => x.SolutionCount), bag.Sum(x => x.Spin), maxNumberActiveSolvers);
         }
+
+
+        static void FirstColumnHalfWithFlip()
+        {
+            var sw = Stopwatch.StartNew();
+            long activeSolvers = 0;
+            long maxNumberActiveSolvers = 0;
+
+            var bag = new ConcurrentBag<Solver>();
+
+            // 8 => 4, 9 => 5, 10 => 5
+            int midPoint = (BoardSize + 1) / 2;
+            // 0, 1, 2, 3, 4 - - board size 9 or 10
+
+            // TODO: test without MaxParallel=8.  IOW let the CPU oversubscribe a bit, IOW trust the OS & CPU to be "fully busy" and balance the work (over .NET Parallel.For() to schedule).
+            var po = new ParallelOptions() { MaxDegreeOfParallelism = 8 };
+            Parallel.For(0, midPoint, po, (index) =>
+            {
+                try
+                {
+                    bool isMidpointOdd = index == 0 && BoardSize % 2 == 1;
+
+                    // 4, 3, 2, 1, 0 - board size 9 or 10
+                    index = (midPoint - 1) - index; // count down, not up
+                    long active = Interlocked.Increment(ref activeSolvers);
+                    if (active > maxNumberActiveSolvers)
+                        maxNumberActiveSolvers = active; // this doesn't have to be threadsafe... 
+
+                    // Start/run the mid-point solver first, b/c it has to flip and de-duplicate each solution, and we don't want the long-poll to run last.
+                    var solver = isMidpointOdd ? new SolverFlipDedupe() as Solver
+                        : new SolverFlipNoDedupe();
+                    solver.Build0(0, index, index + 1);
+                    bag.Add(solver);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref activeSolvers);
+                }
+            });
+
+            sw.Stop();
+            ReportSummary(sw, BoardSize, bag.Sum(x => x.SolutionCount), bag.Sum(x => x.Spin), maxNumberActiveSolvers);
+        }
+        const TestIntType _1u = 1u;
 
         public class Solver
         {
             public long Spin;
-            public long Count;
-            private int[] _Current;
-            private uint _YLine;
-            private uint _DownDiag;
-            private uint _UpDiag;
+            protected long Count;
+            protected int[] _Current;
+            protected TestIntType _YLine;
+            protected TestIntType _DownDiag;
+            protected TestIntType _UpDiag;
+#if TREENODE
+            protected TreeNode[] nodeCache = new TreeNode[BoardSize];
+#endif
 
-            public Solver(int boardSize)
+            public Solver()
             {
                 _Current = new int[BoardSize];
             }
+
+            public virtual long SolutionCount => Count;
 
             //recursive method to iterate all potential positions
             //maintain state as we go so when we come back to a previous loop and iterate, we don't have to rebuild the entire state
             //only iterate through half as we use Y-flip to find other solutions
             public void Build0(int position, int start, int end)
             {
-                uint tempY, tempDown, tempUp;
+                TestIntType tempY, tempDown, tempUp;
 
                 if (start == 0)
                 {
-                    tempY = 1u;
-                    tempUp = 1u << position;
+                    tempY = _1u;
+                    tempUp = _1u << position;
                     // Natural down diaganal would be -8 (h1) => +8 (a8).
                     // We shift it by +BoardSize to keep values positive.  So our 
                     // down diaganal is 0 (h1) => +16 (a8).
-                    tempDown = 1u << BoardSize + position;
+                    tempDown = _1u << BoardSize + position;
                 }
                 else if (position == 0)
                 {
-                    tempY = 1u << start;
-                    tempUp = 1u << start;
-                    tempDown = 1u << BoardSize - start;
+                    tempY = _1u << start;
+                    tempUp = _1u << start;
+                    tempDown = _1u << BoardSize - start;
                 }
                 else
                     throw new Exception("bad state for optimized shift");
@@ -128,13 +195,9 @@ namespace QueenSolutionConsole
 
             public void Build1(int position)
             {
-                uint tempY = 1u;
-                uint tempUp = 1u << position;
-
-                // Natural down diaganal would be -8 (h1) => +8 (a8).
-                // We shift it by +BoardSize to keep values positive.  So our 
-                // down diaganal is 0 (h1) => +16 (a8).
-                uint tempDown = 1u << BoardSize + position;
+                TestIntType tempY = _1u;
+                TestIntType tempUp = _1u << position;
+                TestIntType tempDown = _1u << BoardSize + position;
 
                 for (int x = 0; x < BoardSize; x++, tempY <<= 1, tempUp <<= 1, tempDown >>= 1)
                 {
@@ -161,15 +224,30 @@ namespace QueenSolutionConsole
                         else //if (position == BoardSize - 1)
                         {
                             Count++;
-                            //int[] t1 = new int[BoardSize];
-                            //Array.Copy(_Current, t1, BoardSize);
-                            //Solutions.Push(t1);
+                            RecordSolution();
                         }
                     }
                 }
             }
 
-            //not used yet
+
+            public virtual void RecordSolution()
+            {
+                //int[] t1 = new int[BoardSize];
+                //Array.Copy(_Current, t1, BoardSize);
+                //Solutions.Push(t1);
+            }
+
+            public static int[] YFlip(int[] placed)
+            {
+                int[] test = new int[BoardSize];
+                for (int x = 0; x < BoardSize; x++)
+                    test[x] = BoardSizeMinus1 - placed[x];
+
+                return test;
+            }
+
+#region not used yet
             private int[] XFlip(int[] placed)
             {
                 int[] test = new int[BoardSize];
@@ -180,16 +258,6 @@ namespace QueenSolutionConsole
                     test[BoardSize - x - 1] = placed[x];
                     test[x] = temp;
                 }
-
-                return test;
-            }
-
-            //not used
-            private int[] YFlip(int[] placed)
-            {
-                int[] test = new int[BoardSize];
-                for (int x = 0; x < BoardSize; x++)
-                    test[x] = BoardSize - 1 - placed[x];
 
                 return test;
             }
@@ -254,11 +322,67 @@ namespace QueenSolutionConsole
                 }
                 return true;
             }
-
-
-
+#endregion // not used yet
         }
 
+        public class SolverFlipNoDedupe : Solver
+        {
+            public override long SolutionCount => Count * 2;
+        }
+
+#if TREENODE
+        public class TreeNode
+        {
+            public Dictionary<byte, TreeNode> Children { get; } = new Dictionary<byte, TreeNode>();
+            public TreeNode Parent { get; set; }
+        }
+#endif
+
+        public class SolverFlipDedupe : Solver
+        {
+            HashSet<string> SolutionSet { get; } = new HashSet<string>();
+            //TreeNode root;
+
+            public SolverFlipDedupe() : base()
+            {
+                Console.WriteLine();
+                //root = new TreeNode();
+            }
+
+            public override long SolutionCount => SolutionSet.Count;
+
+            public override void RecordSolution()
+            {
+                SolutionSet.Add(string.Join(",", _Current));
+                var flipped = YFlip(_Current);
+                SolutionSet.Add(string.Join(",", flipped));
+            }
+
+#if TREENODE
+            public void RecordSolutionWithTree()
+            {
+                AddSolution(_Current);
+                AddSolution(YFlip(_Current));
+            }
+
+            public void AddSolution(int [] solution)
+            {
+                var node = root;
+                for (int i = 0; i < solution.Length; ++i)
+                {
+                    byte y = (byte)solution[i];
+                    if (!node.Children.ContainsKey(y))
+                    {
+                        var newNode = new TreeNode() { Parent = node };
+                        node.Children.Add(y, newNode);
+                        node = newNode;
+                    }
+                    else
+                        node = node.Children[y];
+                }
+            }
+#endif
+        }
 
     }
 }

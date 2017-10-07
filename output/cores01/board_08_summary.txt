@@ -1,3 +1,4 @@
-Board Size = 8  Total Spin=15720
-Time 0 milliseconds  Solutions=92
- at 2017-10-06T22:52:01Z by yzorg
+Board Size = 8  Total Spin=15,720
+  Time 0 milliseconds
+  Solutions=92
+ at 2017-10-07T02:55:28Z by yzorg

@@ -1,0 +1,4 @@
+Board Size = 17  Total Spin=71,809,910,299
+  Time 93,918 milliseconds
+  Solutions=95,815,104
+ at 2017-10-07T03:01:42Z by yzorg
