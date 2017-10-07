@@ -1,0 +1,3 @@
+Board Size = 8  Total Spin=7860
+Time 21 milliseconds  Solutions=92
+ at 2017-09-28T19:11:48Z by mattlyons
