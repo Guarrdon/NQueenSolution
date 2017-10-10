@@ -15,7 +15,7 @@ namespace QueenSolutionConsole
 
     public partial class Program
     {
-        static int BoardSize = 13;
+        static int BoardSize = 10;
         static int BoardSizeMinus1 = BoardSize - 1;
 
         public static void Main(string[] args)
@@ -30,9 +30,7 @@ namespace QueenSolutionConsole
             {
                 BackTrackingSingleThreaded();
             }
-            //else if (BoardSize == 17)
-            //    BackTrackingParallel();
-            else //if (BoardSize < 17)
+            else
             {
                 //BackTrackingParallel();
                 FirstColumnHalfWithFlip();
@@ -43,6 +41,7 @@ namespace QueenSolutionConsole
         {
             var sw = Stopwatch.StartNew();
             var solver = new Solver();
+
 
             solver.Build1(0);
 
@@ -109,7 +108,7 @@ namespace QueenSolutionConsole
                         maxNumberActiveSolvers = active; // this doesn't have to be threadsafe... 
 
                     // Start/run the mid-point solver first, b/c it has to flip and de-duplicate each solution, and we don't want the long-poll to run last.
-                    var solver = isMidpointOdd ? new SolverFlipDedupe() as Solver
+                    var solver = isMidpointOdd ? new Solver() as Solver
                         : new SolverFlipNoDedupe();
                     solver.Build0(0, index, index + 1);
                     bag.Add(solver);
@@ -133,9 +132,9 @@ namespace QueenSolutionConsole
             protected TestIntType _YLine;
             protected TestIntType _DownDiag;
             protected TestIntType _UpDiag;
-#if TREENODE
-            protected TreeNode[] nodeCache = new TreeNode[BoardSize];
-#endif
+
+            public TreeNode root = new TreeNode();
+            int TreeCount;
 
             public Solver()
             {
@@ -149,6 +148,7 @@ namespace QueenSolutionConsole
             //only iterate through half as we use Y-flip to find other solutions
             public void Build0(int position, int start, int end)
             {
+                root = ((end - start) == 1) ? new TreeNode() : new TreeNode(0);
                 TestIntType tempY, tempDown, tempUp;
 
                 if (start == 0)
@@ -183,7 +183,7 @@ namespace QueenSolutionConsole
                         _DownDiag += tempDown;
                         _UpDiag += tempUp;
 
-                        Build1(position + 1);
+                        Build1(position + 1, () => root.Add(position, x));
 
                         _YLine -= tempY;
                         _DownDiag -= tempDown;
@@ -193,8 +193,10 @@ namespace QueenSolutionConsole
                 }
             }
 
-            public void Build1(int position)
+            public void Build1(int position, Func<TreeNode> parentNodeFunc)
             {
+                Lazy<TreeNode> parentNode = new Lazy<TreeNode>(parentNodeFunc);
+
                 TestIntType tempY = _1u;
                 TestIntType tempUp = _1u << position;
                 TestIntType tempDown = _1u << BoardSize + position;
@@ -215,7 +217,7 @@ namespace QueenSolutionConsole
                             _DownDiag += tempDown;
                             _UpDiag += tempUp;
 
-                            Build1(position + 1);
+                            Build1(position + 1, () => parentNode.Value.Add(position, x));
 
                             _YLine -= tempY;
                             _DownDiag -= tempDown;
@@ -223,19 +225,15 @@ namespace QueenSolutionConsole
                         }
                         else //if (position == BoardSize - 1)
                         {
-                            Count++;
-                            RecordSolution();
+                            if (!parentNode.Value.Children.ContainsKey(x))
+                            {
+                                Count++;
+                                parentNode.Value.Children.Add(x, null);
+                            }
+                            //RecordSolution();
                         }
                     }
                 }
-            }
-
-
-            public virtual void RecordSolution()
-            {
-                //int[] t1 = new int[BoardSize];
-                //Array.Copy(_Current, t1, BoardSize);
-                //Solutions.Push(t1);
             }
 
             public static int[] YFlip(int[] placed)
@@ -247,7 +245,98 @@ namespace QueenSolutionConsole
                 return test;
             }
 
-#region not used yet
+            public class TreeNode
+            {
+                public TreeNode()
+                {
+                    Children = new Dictionary<int, TreeNode>();
+                }
+
+                public TreeNode(int position)
+                {
+                    if (position <= BoardSize / 2)
+                    {
+                        Flat = new ValueTuple<int, TreeNode>[BoardSize];
+                    }
+                    else
+                        Children = new Dictionary<int, TreeNode>();
+                }
+
+                public Dictionary<int, TreeNode> Children { get; set; } //= new Dictionary<byte, TreeNode>();
+
+                public ValueTuple<int, TreeNode> [] Flat;
+
+                public TreeNode Add(int position, int y)
+                {
+                    TreeNode node;
+                    if (Flat != null)
+                    {
+                        if (Flat[y].Item2 == null)
+                            Flat[y] = ValueTuple.Create(y, node = new TreeNode(position));
+                        else
+                            return Flat[y].Item2;
+                    }
+                    else if (!Children.ContainsKey(y))
+                    {
+                        node = new TreeNode(position);
+                        Children.Add(y, node);
+                    }
+                    else
+                        node = Children[y];
+                    return node;
+                }
+            }
+
+            public virtual void RecordSolution()
+            {
+                //AddSolution(_Current);
+                AddSolution(YFlip(_Current));
+            }
+
+            public void AddSolution(int[] solution)
+            {
+                var node = root;
+                for (int i = 0; i < BoardSize / 2; ++i)
+                {
+                    var y = solution[i];
+                    if (!node.Children.ContainsKey(y))
+                    {
+                        var newNode = new TreeNode();
+                        node.Children.Add(y, newNode);
+                        node = newNode;
+                    }
+                    else
+                        node = node.Children[y];
+                }
+
+                for (int i = BoardSize / 2; i < BoardSizeMinus1; ++i)
+                {
+                    byte y = (byte)solution[i];
+                    if (!node.Children.ContainsKey(y))
+                    {
+                        var newNode = new TreeNode();
+                        node.Children.Add(y, newNode);
+                        node = newNode;
+                    }
+                    else
+                        node = node.Children[y];
+                }
+
+                byte y2 = (byte)solution[BoardSizeMinus1];
+                if (!node.Children.ContainsKey(y2))
+                {
+                    node.Children.Add(y2, null);
+                    ++TreeCount;
+                }
+            }
+
+            public void Build1(int y)
+            {
+                root = new TreeNode(0);
+                Build1(0, () => root);
+            }
+
+            #region not used yet
             private int[] XFlip(int[] placed)
             {
                 int[] test = new int[BoardSize];
@@ -322,67 +411,12 @@ namespace QueenSolutionConsole
                 }
                 return true;
             }
-#endregion // not used yet
+            #endregion // not used yet
         }
 
         public class SolverFlipNoDedupe : Solver
         {
             public override long SolutionCount => Count * 2;
         }
-
-#if TREENODE
-        public class TreeNode
-        {
-            public Dictionary<byte, TreeNode> Children { get; } = new Dictionary<byte, TreeNode>();
-            public TreeNode Parent { get; set; }
-        }
-#endif
-
-        public class SolverFlipDedupe : Solver
-        {
-            HashSet<string> SolutionSet { get; } = new HashSet<string>();
-            //TreeNode root;
-
-            public SolverFlipDedupe() : base()
-            {
-                Console.WriteLine();
-                //root = new TreeNode();
-            }
-
-            public override long SolutionCount => SolutionSet.Count;
-
-            public override void RecordSolution()
-            {
-                SolutionSet.Add(string.Join(",", _Current));
-                var flipped = YFlip(_Current);
-                SolutionSet.Add(string.Join(",", flipped));
-            }
-
-#if TREENODE
-            public void RecordSolutionWithTree()
-            {
-                AddSolution(_Current);
-                AddSolution(YFlip(_Current));
-            }
-
-            public void AddSolution(int [] solution)
-            {
-                var node = root;
-                for (int i = 0; i < solution.Length; ++i)
-                {
-                    byte y = (byte)solution[i];
-                    if (!node.Children.ContainsKey(y))
-                    {
-                        var newNode = new TreeNode() { Parent = node };
-                        node.Children.Add(y, newNode);
-                        node = newNode;
-                    }
-                    else
-                        node = node.Children[y];
-                }
-            }
-#endif
-        }
-
     }
 }

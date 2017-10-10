@@ -1,4 +1,5 @@
 Board Size = 8  Total Spin=15,720
-  Time 0 milliseconds
+  Time 2 milliseconds
   Solutions=92
- at 2017-10-07T02:55:28Z by yzorg
+  Features: solution tree
+ at 2017-10-10T02:15:38Z by yzorg

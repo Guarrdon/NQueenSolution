@@ -14,6 +14,7 @@ namespace QueenSolutionConsole
                 .AppendLine($"Board Size = {boardSize}  Total Spin={spins:n0}")
                 .AppendLine($"  Time {sw.ElapsedMilliseconds:n0} milliseconds")
                 .AppendLine($"  Solutions={count:n0}")
+                .AppendLine($"  Features: solution tree")
                 .AppendLine($" at {DateTime.UtcNow:s}Z by {Environment.UserName}")
                 .ToString();
 

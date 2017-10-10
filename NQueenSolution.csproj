@@ -8,7 +8,7 @@
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
-    <DefineConstants>TRACE;RELEASE;NETCOREAPP2_0;VS</DefineConstants>
+    <DefineConstants>TRACE;RELEASE;NETCOREAPP2_0;VS;RELEASE;NETCOREAPP2_0;TREENODE</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
